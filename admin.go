@@ -74,24 +74,6 @@ func (admin AdminClient) grantNamespacePermissionsToRole(tenant string, namespac
 	return admin.client.Namespaces().GrantNamespacePermission(*nsName, role, []common.AuthAction{"produce", "consume"})
 }
 
-func (admin AdminClient) createTopic(tenant string, namespace string, topic string) error {
-	topicName, err := utils.GetTopicName(fmt.Sprintf("%s/%s/%s", tenant, namespace, topic))
-	if err != nil {
-		return err
-	}
-
-	err = admin.client.Topics().Create(*topicName, 0)
-	if err != nil {
-		if strings.Contains(err.Error(), "409 reason: This topic already exist") {
-			fmt.Printf("The topic %s already exists\n", topicName)
-		} else {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (admin AdminClient) cleanupTopics(tenant string, namespace string) error {
 	nsName, err := utils.GetNameSpaceName(tenant, namespace)
 	if err != nil {
