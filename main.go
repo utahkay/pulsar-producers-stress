@@ -31,7 +31,7 @@ func main() {
 	}
 	fmt.Println("Created admin client successfully")
 
-	_, err = newPulsarClient(PulsarClientConfig{
+	pulsarClient, err := newPulsarClient(PulsarClientConfig{
 		ServiceUrl: "pulsar+ssl://kay-1.test-kay-johansen.test.sn2.dev:6651",
 		Oauth: &OauthConfig{
 			IssuerUrl:               "https://auth.test.cloud.gcp.streamnative.dev/",
@@ -42,6 +42,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer pulsarClient.Close()
 	fmt.Println("Created Pulsar client successfully")
 
 	err = admin.createTopic("private", "test", "kay-1")

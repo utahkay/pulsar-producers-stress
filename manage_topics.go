@@ -7,6 +7,7 @@ import (
 	"github.com/apache/pulsar-client-go/oauth2"
 	"github.com/streamnative/pulsarctl/pkg/auth"
 	ctl "github.com/streamnative/pulsarctl/pkg/pulsar"
+
 	"github.com/streamnative/pulsarctl/pkg/pulsar/common"
 	"github.com/streamnative/pulsarctl/pkg/pulsar/utils"
 )
@@ -34,7 +35,13 @@ func newAdmin(config AdminConfig) (AdminClient, error) {
 	if err != nil {
 		return AdminClient{}, err
 	}
-	return AdminClient{client: ctl.NewWithAuthProvider(conf, oauth2Auth)}, nil
+
+	client, err := ctl.NewPulsarClientWithAuthProvider(conf, oauth2Auth)
+	if err != nil {
+		return AdminClient{}, err
+	}
+
+	return AdminClient{client: client}, nil
 }
 
 func (admin AdminClient) createTopic(tenant string, namespace string, cluster string) error {
