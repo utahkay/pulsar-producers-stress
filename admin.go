@@ -16,21 +16,16 @@ type AdminClient struct {
 	client ctl.Client
 }
 
-type AdminConfig struct {
-	AdminServiceUrl string
-	Oauth           *OauthConfig
-}
-
-func newAdmin(config AdminConfig) (AdminClient, error) {
+func newAdmin(config ClientConfig) (AdminClient, error) {
 	conf := &common.Config{
-		WebServiceURL:    config.AdminServiceUrl,
+		WebServiceURL:    config.ServiceUrl,
 		PulsarAPIVersion: common.V2,
 	}
 	issuer := oauth2.Issuer{
 		IssuerEndpoint: config.Oauth.IssuerUrl,
 		Audience:       config.Oauth.Audience,
 	}
-	keyFile := config.Oauth.AdminCredentialsFileUrl
+	keyFile := config.Oauth.CredentialsFileUrl
 	oauth2Auth, err := auth.NewAuthenticationOAuth2WithDefaultFlow(issuer, keyFile)
 	if err != nil {
 		return AdminClient{}, err

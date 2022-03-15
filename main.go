@@ -10,12 +10,12 @@ import (
 )
 
 type OauthConfig struct {
-	IssuerUrl               string
-	Audience                string
-	AdminCredentialsFileUrl string
+	IssuerUrl          string
+	Audience           string
+	CredentialsFileUrl string
 }
 
-type PulsarClientConfig struct {
+type ClientConfig struct {
 	ServiceUrl string
 	Oauth      *OauthConfig
 }
@@ -26,12 +26,12 @@ var namespace = "test"
 var role = "test-kay-johansen@test-kay-johansen.auth.test.cloud.gcp.streamnative.dev"
 
 func main() {
-	admin, err := newAdmin(AdminConfig{
-		AdminServiceUrl: "https://kay-1.test-kay-johansen.test.sn2.dev",
+	admin, err := newAdmin(ClientConfig{
+		ServiceUrl: "https://kay-1.test-kay-johansen.test.sn2.dev",
 		Oauth: &OauthConfig{
-			IssuerUrl:               "https://auth.test.cloud.gcp.streamnative.dev/",
-			Audience:                "urn:sn:pulsar:test-kay-johansen:kay-1",
-			AdminCredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-super-admin-test.json",
+			IssuerUrl:          "https://auth.test.cloud.gcp.streamnative.dev/",
+			Audience:           "urn:sn:pulsar:test-kay-johansen:kay-1",
+			CredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-super-admin-test.json",
 		},
 	})
 	if err != nil {
@@ -39,12 +39,12 @@ func main() {
 	}
 	fmt.Println("Created admin client successfully")
 
-	pulsarClient, err := newPulsarClient(PulsarClientConfig{
+	pulsarClient, err := newPulsarClient(ClientConfig{
 		ServiceUrl: "pulsar+ssl://kay-1.test-kay-johansen.test.sn2.dev:6651",
 		Oauth: &OauthConfig{
-			IssuerUrl:               "https://auth.test.cloud.gcp.streamnative.dev/",
-			Audience:                "urn:sn:pulsar:test-kay-johansen:kay-1",
-			AdminCredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-test.json",
+			IssuerUrl:          "https://auth.test.cloud.gcp.streamnative.dev/",
+			Audience:           "urn:sn:pulsar:test-kay-johansen:kay-1",
+			CredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-test.json",
 		},
 	})
 	if err != nil {
@@ -60,7 +60,7 @@ func main() {
 
 	defer admin.cleanupTopics(tenant, namespace)
 
-	for i := 1; i < 10; i++ {
+	for i := 1; i <= 10; i++ {
 		go produce(pulsarClient, i)
 	}
 
@@ -91,12 +91,12 @@ func produce(pulsarClient pulsar.Client, index int) error {
 	return nil
 }
 
-func newPulsarClient(config PulsarClientConfig) (pulsar.Client, error) {
+func newPulsarClient(config ClientConfig) (pulsar.Client, error) {
 	oauth := pulsar.NewAuthenticationOAuth2(map[string]string{
 		"type":       "client_credentials",
 		"issuerUrl":  config.Oauth.IssuerUrl,
 		"audience":   config.Oauth.Audience,
-		"privateKey": config.Oauth.AdminCredentialsFileUrl,
+		"privateKey": config.Oauth.CredentialsFileUrl,
 	})
 	return pulsar.NewClient(pulsar.ClientOptions{
 		URL:            config.ServiceUrl,
