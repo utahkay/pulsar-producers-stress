@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 )
@@ -16,6 +19,11 @@ type PulsarClientConfig struct {
 	ServiceUrl string
 	Oauth      *OauthConfig
 }
+
+var cluster = "kay-1"
+var tenant = "private"
+var namespace = "test"
+var role = "test-kay-johansen@test-kay-johansen.auth.test.cloud.gcp.streamnative.dev"
 
 func main() {
 	admin, err := newAdmin(AdminConfig{
@@ -45,17 +53,42 @@ func main() {
 	defer pulsarClient.Close()
 	fmt.Println("Created Pulsar client successfully")
 
-	err = admin.createTopic("private", "test", "kay-1")
-	if err != nil {
+	if err = admin.createNamespace(tenant, namespace, cluster, role); err != nil {
 		panic(err)
 	}
+	fmt.Println("Created namespace successfully")
 
-	err = admin.cleanupTopics("private", "test")
-	if err != nil {
-		panic(err)
+	defer admin.cleanupTopics(tenant, namespace)
+
+	for i := 1; i < 10; i++ {
+		go produce(pulsarClient, i)
 	}
 
-	fmt.Println("Test completed successfully")
+	c := make(chan struct{})
+	<-c
+}
+
+func produce(pulsarClient pulsar.Client, index int) error {
+	topic := fmt.Sprintf("topic-%d", index)
+	producer, err := pulsarClient.CreateProducer(pulsar.ProducerOptions{Topic: fmt.Sprintf("%s/%s/%s", tenant, namespace, topic)})
+	if err != nil {
+		return err
+	}
+	fmt.Println("Created Pulsar producer successfully")
+
+	for i := 1; i <= 10; i++ {
+		msg := fmt.Sprintf("message-%d", i)
+		msgId, err := producer.Send(context.Background(), &pulsar.ProducerMessage{
+			Payload: []byte(msg),
+		})
+		if err != nil {
+			return err
+		}
+		log.Printf("[%d] Produced message msgId: %v -- content: '%s'", index, msgId, msg)
+		time.Sleep(1 * time.Second)
+	}
+
+	return nil
 }
 
 func newPulsarClient(config PulsarClientConfig) (pulsar.Client, error) {

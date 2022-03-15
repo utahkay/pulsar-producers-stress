@@ -44,7 +44,7 @@ func newAdmin(config AdminConfig) (AdminClient, error) {
 	return AdminClient{client: client}, nil
 }
 
-func (admin AdminClient) createTopic(tenant string, namespace string, cluster string) error {
+func (admin AdminClient) createNamespace(tenant string, namespace string, cluster string, role string) error {
 	err := admin.client.Tenants().Create(utils.TenantData{
 		Name:            tenant,
 		AllowedClusters: []string{cluster},
@@ -58,7 +58,23 @@ func (admin AdminClient) createTopic(tenant string, namespace string, cluster st
 		return err
 	}
 
-	topic := "topic-1"
+	if len(role) != 0 {
+		return admin.grantNamespacePermissionsToRole(tenant, namespace, role)
+	}
+
+	return nil
+}
+
+func (admin AdminClient) grantNamespacePermissionsToRole(tenant string, namespace string, role string) error {
+	nsName, err := utils.GetNameSpaceName(tenant, namespace)
+	if err != nil {
+		return err
+	}
+
+	return admin.client.Namespaces().GrantNamespacePermission(*nsName, role, []common.AuthAction{"produce", "consume"})
+}
+
+func (admin AdminClient) createTopic(tenant string, namespace string, topic string) error {
 	topicName, err := utils.GetTopicName(fmt.Sprintf("%s/%s/%s", tenant, namespace, topic))
 	if err != nil {
 		return err
