@@ -94,7 +94,6 @@ func main() {
 	log.Println("INFO Created Pulsar client successfully")
 
 	// Run numProducersPerTopic on each of numTopics topics
-	log.Println("INFO Starting the test")
 	go pulsarClient.startTest(tenant, namespace)
 
 	// Run forever, while serving prometheus metrics
