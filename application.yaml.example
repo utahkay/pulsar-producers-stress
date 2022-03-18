@@ -1,0 +1,17 @@
+tenant: private
+namespace: test
+numTopics: 2
+numProducersPerTopic: 3
+messageIntervalMs: 1000
+startProducerIntervalMs: 1000
+
+heartbeatServiceAccount: 
+pulsarClient: 
+    serviceUrl: 
+    serviceUrlAdmin: 
+    oauthIssuerUrl: 
+    oauthAudience: 
+    oauthCredentialsUrl: 
+    oauthCredentialsUrlAdmin: 
+target: 
+targetNamespace: 

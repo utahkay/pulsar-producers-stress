@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/apache/pulsar-client-go/oauth2"
@@ -79,42 +80,35 @@ func (admin AdminClient) cleanupTopics(tenant string, namespace string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Partitioned topics:")
-	fmt.Println(partitionedTopics)
-	fmt.Println("Non-partitioned topics:")
-	fmt.Println(nonPartitionedTopics)
 
 	for _, t := range partitionedTopics {
-		fmt.Printf("Deleting partitioned topic %s\n", t)
-		err = admin.deleteTopic(t, true)
-		if err != nil {
-			return err
-		}
+		admin.deleteTopic(t, true)
 	}
 	for _, t := range nonPartitionedTopics {
-		fmt.Printf("Deleting non-partitioned topic %s\n", t)
 		admin.deleteTopic(t, false)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (admin AdminClient) deleteTopic(topic string, partitioned bool) error {
+func (admin AdminClient) deleteTopic(topic string, partitioned bool) {
 	force := true
 	nonPartitioned := !partitioned
 
+	partitionedText := "partitioned"
+	if nonPartitioned {
+		partitionedText = "non-partitioned"
+	}
+	log.Printf("INFO deleteTopic() deleting %s topic %s\n", partitionedText, topic)
+
 	topicName, err := utils.GetTopicName(topic)
 	if err != nil {
-		return err
+		log.Printf("WARN deleteTopic was unable to parse topic name %s: %s\n", topic, err)
+		return
 	}
 
 	err = admin.client.Topics().Delete(*topicName, force, nonPartitioned)
 	if err != nil {
-		return err
+		log.Printf("WARN deleteTopic was unable to delete topic %s: %s\n", topicName, err)
 	}
-
-	return nil
 }

@@ -1,7 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"flag"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/viper"
 )
 
 type OauthConfig struct {
@@ -15,49 +23,92 @@ type ClientConfig struct {
 	Oauth      *OauthConfig
 }
 
-var cluster = "kay-1"
-var tenant = "private"
-var namespace = "test"
-var role = "test-kay-johansen@test-kay-johansen.auth.test.cloud.gcp.streamnative.dev"
+var (
+	config  *viper.Viper
+	cleanup = flag.Bool("cleanup", false, "Delete all topics on the namespace")
+
+	messageProducedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "message_produced_total",
+		Help: "Counter of number of messages produced",
+	})
+
+	numberProducersTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "number_producers_total",
+		Help: "Counter of number of producers currently active",
+	})
+)
 
 func main() {
+	var cluster = config.GetString("target")
+	var tenant = config.GetString("tenant")
+	var namespace = config.GetString("namespace")
+	var role = config.GetString("heartbeatServiceAccount")
+
+	flag.Parse()
+	if *cleanup {
+		log.Printf("INFO Cleanup selected; will delete all topics in namespace %s/%s", tenant, namespace)
+	}
+
+	// Use the admin service account to set up the namespace
 	admin, err := newAdmin(ClientConfig{
-		ServiceUrl: "https://kay-1.test-kay-johansen.test.sn2.dev",
+		ServiceUrl: config.GetString("pulsarClient.serviceUrlAdmin"),
 		Oauth: &OauthConfig{
-			IssuerUrl:          "https://auth.test.cloud.gcp.streamnative.dev/",
-			Audience:           "urn:sn:pulsar:test-kay-johansen:kay-1",
-			CredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-super-admin-test.json",
+			IssuerUrl:          config.GetString("pulsarClient.oauthIssuerUrl"),
+			Audience:           config.GetString("pulsarClient.oauthAudience"),
+			CredentialsFileUrl: config.GetString("pulsarClient.oauthCredentialsUrlAdmin"),
 		},
 	})
 	if err != nil {
-		panic(err)
+		log.Fatalf("ERROR Failed to create admin client: %v\n", err)
 	}
-	fmt.Println("Created admin client successfully")
+	log.Println("INFO Created admin client successfully")
 
-	pulsarClient, err := newPulsarClient(ClientConfig{
-		ServiceUrl: "pulsar+ssl://kay-1.test-kay-johansen.test.sn2.dev:6651",
-		Oauth: &OauthConfig{
-			IssuerUrl:          "https://auth.test.cloud.gcp.streamnative.dev/",
-			Audience:           "urn:sn:pulsar:test-kay-johansen:kay-1",
-			CredentialsFileUrl: "file:///Users/kayjohansen/service-account/test-kay-johansen-test.json",
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Created Pulsar client successfully")
-
+	// Create tenant and namespace, and grant permissions to heartbeat service account
 	if err = admin.createNamespace(tenant, namespace, cluster, role); err != nil {
+		log.Fatalf("ERROR Failed to create namespace: %v\n", err)
+	}
+	log.Println("INFO Created namespace successfully")
+
+	// Delete all existing topics on namespace to start clean
+	if err := admin.cleanupTopics(tenant, namespace); err != nil {
+		log.Printf("WARN Unable to delete topics to be able to start with an empty namespace: %s", err)
+	}
+
+	if *cleanup {
+		log.Println("INFO Cleanup complete")
+		os.Exit(0)
+	}
+
+	// Use the heartbeat service account to produce messages
+	pulsarClient, err := newPulsarClient(ClientConfig{
+		ServiceUrl: config.GetString("pulsarClient.serviceUrl"),
+		Oauth: &OauthConfig{
+			IssuerUrl:          config.GetString("pulsarClient.oauthIssuerUrl"),
+			Audience:           config.GetString("pulsarClient.oauthAudience"),
+			CredentialsFileUrl: config.GetString("pulsarClient.oauthCredentialsUrl"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("ERROR Failed to create Pulsar client: %v\n", err)
+	}
+	log.Println("INFO Created Pulsar client successfully")
+
+	// Run numProducersPerTopic on each of numTopics topics
+	go pulsarClient.startTest(tenant, namespace)
+
+	// Run forever, while serving prometheus metrics
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":8080", nil)
+}
+
+func init() {
+	log.Println("INFO Loading config.")
+	config = viper.New()
+	config.SetConfigName("application")
+	config.SetConfigType("yaml")
+	config.AddConfigPath(".")
+	config.AddConfigPath("/var/config/")
+	if err := config.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	fmt.Println("Created namespace successfully")
-
-	defer admin.cleanupTopics(tenant, namespace)
-
-	for i := 1; i <= 10; i++ {
-		go pulsarClient.produce(i)
-	}
-
-	c := make(chan struct{})
-	<-c
 }
