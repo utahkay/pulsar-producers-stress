@@ -1,4 +1,4 @@
-module many-producers
+module github.com/utahkay/pulsar-producers-stress
 
 go 1.17
 
