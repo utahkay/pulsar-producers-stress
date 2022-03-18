@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine AS build-env
+FROM golang:1.17-alpine3.14 AS build-env
 RUN apk add build-base
 
 WORKDIR /build
